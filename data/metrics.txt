@@ -1,0 +1,39 @@
+
+================================================================================
+  RECOVERY EVALUATION - 50,000 failed payments, Rs 103,045,716 at risk
+================================================================================
+                                       BASELINE              AGENT          DELTA
+  ----------------------------------------------------------------------------
+  recovery rate                          25.96%             48.75%       +22.79pp
+  value recovered                 Rs 23,331,139      Rs 44,277,418         +89.8%
+  payments recovered                     12,980             24,376        +11,396
+  attempts spent                         49,737             48,227         -1,510
+  wasted attempts                        36,757             23,851        -12,906
+  attempt efficiency                     26.10%             50.54%       +24.45pp
+  ----------------------------------------------------------------------------
+  held for approval                         261                245               
+  blocked by guardrails                       2              1,528               
+  cost per decision                   $0.000000          $0.000000               
+  p50 latency                          0.008 ms           0.029 ms               
+  p95 latency                          0.020 ms           0.058 ms               
+================================================================================
+
+  AGENT DECISIONS BY ARCHETYPE
+  ----------------------------------------------------------------------------
+  archetype                  decided   recovered    hit rate             value
+  CUSTOMER_ACTION             17,351       7,414      42.7%     Rs 12,366,762
+  SWITCH_RAIL                 17,090      10,661      62.4%     Rs 21,907,445
+  RETRY_NOW                   10,023       4,285      42.8%      Rs 7,447,989
+  RETRY_AFTER_WINDOW           4,010       2,016      50.3%      Rs 2,555,221
+  UNRECOVERABLE                1,526           0       0.0%              Rs 0
+  ----------------------------------------------------------------------------
+
+  ABLATION - value recovered with each capability removed
+  ----------------------------------------------------------------------------
+  variant                                recovered      rate    wasted       vs full
+  full agent                         Rs 44,277,418    48.8%    23,851             -
+  - issuer health                    Rs 41,175,258    46.0%    25,241 Rs -3,102,159
+  - rail switching                   Rs 33,040,977    38.1%    29,160Rs -11,236,440
+  - customer nudges                  Rs 35,909,750    38.7%    28,878 Rs -8,367,667
+  - unrecoverable suppression        Rs 44,948,182    49.0%    25,235    Rs 670,765
+  ----------------------------------------------------------------------------

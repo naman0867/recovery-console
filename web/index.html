@@ -1,0 +1,743 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Recovery Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#101d29; --ink-2:#2c3f4f; --muted:#6b8092; --faint:#93a6b4;
+  --paper:#e9edef; --surface:#ffffff; --rule:#d5dee2; --rule-soft:#e6ecee;
+  --recovered:#0d6b5f; --recovered-soft:#d7ebe6;
+  --held:#96600f; --held-soft:#f6e9d3;
+  --lost:#8b2f47; --lost-soft:#f4dde2;
+  --switch:#1f5f8b; --switch-soft:#d9e8f2;
+  --wait:#5b4b8a; --wait-soft:#e3dff0;
+  --sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --shadow:0 1px 2px rgba(16,29,41,.06),0 8px 24px -12px rgba(16,29,41,.18);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper); color:var(--ink); font-family:var(--sans);
+  font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{
+  font-family:var(--mono); font-size:10.5px; font-weight:500;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+}
+.shell{max-width:1440px;margin:0 auto;padding:0 22px 56px}
+
+/* ---------- header ---------- */
+.topbar{
+  position:sticky; top:0; z-index:40; background:rgba(233,237,239,.92);
+  backdrop-filter:blur(8px); border-bottom:1px solid var(--rule);
+}
+.topbar-in{
+  max-width:1440px;margin:0 auto;padding:13px 22px;
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand h1{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:0}
+.brand .tag{font-family:var(--mono);font-size:10.5px;color:var(--muted);letter-spacing:.08em}
+.pill{
+  font-family:var(--mono);font-size:11px;padding:4px 9px;border-radius:3px;
+  border:1px solid var(--rule);background:var(--surface);color:var(--ink-2);
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--recovered);flex:none}
+.dot.pulse{animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.killbtn{
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  padding:6px 12px;border-radius:3px;cursor:pointer;
+  border:1px solid var(--lost);background:var(--surface);color:var(--lost);
+  transition:background .15s,color .15s;
+}
+.killbtn:hover{background:var(--lost-soft)}
+.killbtn.on{background:var(--lost);color:#fff}
+.killbtn:focus-visible,.rowbtn:focus-visible,.tab:focus-visible,input:focus-visible{
+  outline:2px solid var(--switch);outline-offset:2px
+}
+
+/* ---------- hero ---------- */
+.hero{
+  background:var(--surface);border:1px solid var(--rule);border-radius:6px;
+  margin-top:22px;padding:26px 28px 22px;box-shadow:var(--shadow);
+}
+.hero-top{display:flex;gap:38px;align-items:flex-end;flex-wrap:wrap}
+.bignum{font-family:var(--mono);font-size:50px;font-weight:600;letter-spacing:-.03em;line-height:1;margin:8px 0 0}
+.bignum .cur{font-size:24px;color:var(--muted);font-weight:400;margin-right:6px}
+.lift{
+  font-family:var(--mono);font-size:14px;font-weight:600;color:var(--recovered);
+  background:var(--recovered-soft);padding:5px 10px;border-radius:3px;
+}
+.hero-side{margin-left:auto;text-align:right}
+.hero-side .v{font-family:var(--mono);font-size:19px;font-weight:500}
+
+/* ---------- waterfall signature ---------- */
+.wf{margin-top:24px}
+.wf-wrap{position:relative;padding-top:2px}
+.wf-bar{
+  position:relative;height:44px;border-radius:4px;overflow:hidden;
+  background:repeating-linear-gradient(135deg,#eaeff1 0 6px,#e3e9ec 6px 12px);
+  display:flex;border:1px solid var(--rule);
+}
+.wf-seg{height:100%;transition:width .7s cubic-bezier(.22,.7,.3,1);position:relative}
+.wf-seg span{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10.5px;color:#fff;font-weight:500;
+  opacity:0;transition:opacity .3s;pointer-events:none;
+}
+.wf-seg:hover span{opacity:1}
+.wf-tick{
+  position:absolute;top:-6px;height:56px;width:2px;background:var(--ink);
+  transition:left .7s cubic-bezier(.22,.7,.3,1);z-index:5;pointer-events:none;
+}
+.wf-tick::after{
+  content:attr(data-label);position:absolute;top:58px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:10px;color:var(--ink);white-space:nowrap;font-weight:500;
+}
+.wf-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:34px}
+.lg{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.sw{width:10px;height:10px;border-radius:2px;flex:none}
+
+/* ---------- stat strip ---------- */
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px;margin-top:14px}
+.stat{background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:14px 16px}
+.stat .v{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:5px}
+.stat .sub{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:3px}
+
+/* ---------- layout ---------- */
+.grid{display:grid;grid-template-columns:minmax(0,1.72fr) minmax(0,1fr);gap:14px;margin-top:14px}
+.panel{background:var(--surface);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.panel-hd{
+  padding:12px 16px;border-bottom:1px solid var(--rule-soft);
+  display:flex;align-items:center;gap:10px;
+}
+.panel-hd .count{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint)}
+
+/* ---------- feed ---------- */
+.feed{max-height:520px;overflow-y:auto}
+.frow{
+  display:grid;grid-template-columns:76px 1fr 108px 128px 74px;gap:10px;align-items:center;
+  padding:9px 16px;border-bottom:1px solid var(--rule-soft);cursor:pointer;
+  border-left:3px solid transparent;transition:background .12s;
+}
+.frow:hover{background:#f6f9fa}
+.frow.new{animation:slidein .45s ease-out}
+@keyframes slidein{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.frow.ok{border-left-color:var(--recovered)}
+.frow.held{border-left-color:var(--held)}
+.frow.blocked{border-left-color:var(--lost)}
+.f-amt{font-family:var(--mono);font-size:12.5px;font-weight:500;text-align:right}
+.f-err{min-width:0}
+.f-err .code{font-family:var(--mono);font-size:11px;color:var(--ink-2);display:block;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.f-err .meta{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:1px}
+.chip{
+  font-family:var(--mono);font-size:10px;padding:2.5px 6px;border-radius:2px;
+  white-space:nowrap;display:inline-block;font-weight:500;
+}
+.c-retry{background:var(--recovered-soft);color:var(--recovered)}
+.c-wait{background:var(--wait-soft);color:var(--wait)}
+.c-switch{background:var(--switch-soft);color:var(--switch)}
+.c-nudge{background:var(--held-soft);color:var(--held)}
+.c-dead{background:var(--lost-soft);color:var(--lost)}
+.c-tail{background:#e8e2f5;color:#5b4b8a}
+.f-out{font-family:var(--mono);font-size:10.5px;text-align:right}
+.f-out.win{color:var(--recovered);font-weight:600}
+.f-out.miss{color:var(--faint)}
+
+/* ---------- action required strip ---------- */
+.actstrip{
+  background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--held);
+  border-radius:6px;margin-top:22px;padding:13px 18px;display:flex;align-items:center;
+  gap:22px;flex-wrap:wrap;box-shadow:var(--shadow);
+}
+.actstrip .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--held);font-weight:600}
+.actstrip .item{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+.actstrip .item b{font-weight:600}
+.actstrip .item span{color:var(--faint)}
+.actstrip .go{margin-left:auto;display:flex;gap:8px}
+.linkb{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  padding:5px 11px;border-radius:3px;border:1px solid var(--rule);background:var(--surface);
+  color:var(--ink-2);cursor:pointer;transition:.13s;
+}
+.linkb:hover{background:#f2f6f7;border-color:var(--muted)}
+
+/* ---------- age curve ---------- */
+.agerow{display:grid;grid-template-columns:84px 1fr 62px 84px;gap:11px;align-items:center;
+  padding:9px 16px;border-bottom:1px solid var(--rule-soft)}
+.agerow .bd{font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.agerow .track{display:block;height:16px;background:var(--rule-soft);border-radius:2px;overflow:hidden}
+.agerow .fill{display:block;height:100%;background:var(--recovered);border-radius:2px;transition:width .6s}
+.agerow .pc{font-family:var(--mono);font-size:12px;font-weight:600;text-align:right}
+.agerow .vl{font-family:var(--mono);font-size:10.5px;color:var(--faint);text-align:right}
+
+/* ---------- controls popover ---------- */
+.ctrlwrap{position:relative}
+.ctrl{
+  position:absolute;right:0;top:calc(100% + 7px);z-index:50;width:252px;
+  background:var(--surface);border:1px solid var(--rule);border-radius:5px;
+  box-shadow:var(--shadow);padding:12px 14px;display:none;
+}
+.ctrl.open{display:block}
+.ctrl label{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;
+  padding:5px 0;cursor:pointer;color:var(--ink-2)}
+.ctrl input[type=checkbox]{accent-color:var(--lost);cursor:pointer}
+.ctrl .hd{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);margin-bottom:5px}
+.ctrl .div{border-top:1px solid var(--rule-soft);margin:9px 0}
+.dryflag{background:var(--wait-soft);color:var(--wait);border-color:var(--wait)}
+.st.dry_run{color:var(--wait)}
+
+/* ---------- issuer board ---------- */
+.iss{display:flex;align-items:center;gap:10px;padding:8px 16px;
+  border-bottom:1px solid var(--rule-soft);cursor:pointer;transition:background .12s}
+.iss:hover{background:#f6f9fa}
+.iss .nm{font-family:var(--mono);font-size:11.5px;min-width:112px}
+.iss .track{flex:1;display:block;height:5px;background:var(--rule-soft);border-radius:3px;overflow:hidden}
+.iss .fill{display:block;height:100%;border-radius:3px;transition:width .5s}
+.iss .rt{font-family:var(--mono);font-size:10.5px;color:var(--muted);min-width:74px;text-align:right}
+
+/* ---------- approvals ---------- */
+.apv{padding:11px 16px;border-bottom:1px solid var(--rule-soft)}
+.apv-top{display:flex;align-items:baseline;gap:8px}
+.apv-top .amt{font-family:var(--mono);font-size:14px;font-weight:600}
+.apv .why{font-size:11.5px;color:var(--muted);margin:4px 0 8px;line-height:1.4}
+.rowbtn{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  padding:4px 11px;border-radius:3px;border:1px solid var(--rule);
+  background:var(--surface);color:var(--ink-2);cursor:pointer;transition:.13s;
+}
+.rowbtn.go{border-color:var(--recovered);color:var(--recovered)}
+.rowbtn.go:hover{background:var(--recovered);color:#fff}
+.rowbtn.no:hover{background:var(--lost-soft);border-color:var(--lost);color:var(--lost)}
+
+/* ---------- audit ---------- */
+.search{
+  font-family:var(--mono);font-size:11.5px;padding:5px 9px;border:1px solid var(--rule);
+  border-radius:3px;width:230px;background:var(--surface);color:var(--ink);
+}
+.audit{max-height:340px;overflow-y:auto}
+.arow{
+  display:grid;grid-template-columns:132px 96px 118px 1fr 118px;gap:12px;
+  padding:7px 16px;border-bottom:1px solid var(--rule-soft);
+  font-family:var(--mono);font-size:10.5px;align-items:center;
+}
+.arow .rsn{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st{font-weight:600}
+.st.executed{color:var(--recovered)}
+.st.held_for_approval{color:var(--held)}
+.st.blocked,.st.suppressed{color:var(--lost)}
+
+/* ---------- drawer ---------- */
+.scrim{
+  position:fixed;inset:0;background:rgba(16,29,41,.28);z-index:60;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.scrim.open{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(468px,94vw);z-index:70;
+  background:var(--surface);border-left:1px solid var(--rule);
+  transform:translateX(100%);transition:transform .28s cubic-bezier(.22,.7,.3,1);
+  overflow-y:auto;box-shadow:-14px 0 40px -18px rgba(16,29,41,.4);
+}
+.drawer.open{transform:none}
+.dw-hd{padding:18px 22px;border-bottom:1px solid var(--rule)}
+.dw-sec{padding:16px 22px;border-bottom:1px solid var(--rule-soft)}
+.kv{display:grid;grid-template-columns:132px 1fr;gap:5px 12px;font-family:var(--mono);font-size:11.5px}
+.kv dt{color:var(--faint)}
+.kv dd{margin:0;color:var(--ink);word-break:break-word}
+.chain{list-style:none;margin:8px 0 0;padding:0}
+.chain li{
+  position:relative;padding:0 0 12px 20px;font-family:var(--mono);font-size:11px;color:var(--ink-2);
+  border-left:1px solid var(--rule);
+}
+.chain li:last-child{border-left-color:transparent;padding-bottom:0}
+.chain li::before{
+  content:'';position:absolute;left:-4.5px;top:4px;width:8px;height:8px;border-radius:50%;
+  background:var(--surface);border:1.5px solid var(--switch);
+}
+.quote{
+  background:#f6f9fa;border-left:2px solid var(--rule);padding:10px 12px;
+  font-size:12px;line-height:1.5;color:var(--ink-2);border-radius:0 3px 3px 0;
+}
+.closeb{float:right;border:none;background:none;font-size:20px;color:var(--faint);cursor:pointer;line-height:1;padding:0}
+.empty{padding:26px 16px;text-align:center;color:var(--faint);font-family:var(--mono);font-size:11.5px}
+
+@media (max-width:1080px){
+  .grid{grid-template-columns:1fr}
+  .arow{grid-template-columns:118px 88px 1fr;}
+  .arow .rsn,.arow .idk{display:none}
+  .bignum{font-size:38px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">
+    <h1>Recovery Console</h1>
+    <span class="tag">FAILED PAYMENT RECOVERY / TRACK 3</span>
+  </div>
+  <span class="pill"><span class="dot pulse" id="livedot"></span><span id="progress">—</span></span>
+  <span class="pill" id="tierpill">triage —</span>
+  <div class="ctrlwrap">
+    <button class="killbtn" id="kill">Controls</button>
+    <div class="ctrl" id="ctrlpanel">
+      <div class="hd">Kill switch scope</div>
+      <label><input type="checkbox" data-scope="all"> All actions</label>
+      <label><input type="checkbox" data-scope="retries"> Retries only</label>
+      <label><input type="checkbox" data-scope="nudges"> Customer messages</label>
+      <label><input type="checkbox" data-scope="method:upi"> UPI rail</label>
+      <label><input type="checkbox" data-scope="method:card"> Card rail</label>
+      <div class="div"></div>
+      <div class="hd">Mode</div>
+      <label><input type="checkbox" id="dryrun"> Dry run — decide &amp; log, execute nothing</label>
+    </div>
+  </div>
+</div></div>
+
+<div class="shell">
+
+  <section class="actstrip" id="actstrip" style="display:none">
+    <span class="lbl">Action required</span>
+    <span class="item" id="a-approvals"></span>
+    <span class="item" id="a-issuers"></span>
+    <span class="item" id="a-follow"></span>
+    <span class="go">
+      <button class="linkb" onclick="document.getElementById('approvals').scrollIntoView({behavior:'smooth',block:'center'})">Review approvals</button>
+      <button class="linkb" onclick="document.getElementById('issuers').scrollIntoView({behavior:'smooth',block:'center'})">Issuer alerts</button>
+    </span>
+  </section>
+
+  <section class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="eyebrow">Value recovered</div>
+        <div class="bignum"><span class="cur">₹</span><span id="recovered">0</span></div>
+      </div>
+      <div class="lift" id="lift">—</div>
+      <div class="hero-side">
+        <div class="eyebrow">At risk in window</div>
+        <div class="v mono" id="atrisk">₹0</div>
+      </div>
+    </div>
+
+    <div class="wf">
+      <div class="eyebrow" style="margin-bottom:22px">Recovery waterfall — recovered value by decision type, against the fixed-retry baseline</div>
+      <div class="wf-wrap">
+        <div class="wf-bar" id="wfbar"></div>
+        <div class="wf-tick" id="wftick" data-label="baseline"></div>
+      </div>
+      <div class="wf-legend" id="wflegend"></div>
+    </div>
+  </section>
+
+  <section class="strip">
+    <div class="stat"><div class="eyebrow">Recovery rate</div><div class="v" id="s-rate">—</div><div class="sub" id="s-rate-sub">baseline —</div></div>
+    <div class="stat"><div class="eyebrow">Attempt efficiency</div><div class="v" id="s-eff">—</div><div class="sub" id="s-eff-sub">recovered per attempt</div></div>
+    <div class="stat"><div class="eyebrow">Wasted attempts</div><div class="v" id="s-waste">—</div><div class="sub">spent, nothing returned</div></div>
+    <div class="stat"><div class="eyebrow">Held for approval</div><div class="v" id="s-held">—</div><div class="sub" id="s-held-sub">awaiting operator</div></div>
+    <div class="stat"><div class="eyebrow">Model spend</div><div class="v" id="s-cost">—</div><div class="sub" id="s-cost-sub">per decision</div></div>
+  </section>
+
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <div class="panel-hd">
+          <span class="eyebrow">Live failure feed</span>
+          <span class="count" id="feedcount">—</span>
+        </div>
+        <div class="feed" id="feed"><div class="empty">Waiting for the first failures</div></div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <div class="panel-hd">
+          <span class="eyebrow">Audit log</span>
+          <input class="search" id="auditq" placeholder="filter by id, archetype, status" />
+        </div>
+        <div class="audit" id="audit"><div class="empty">No entries yet.</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="panel-hd">
+          <span class="eyebrow">Recovery vs failure age</span>
+          <span class="count">when the action fired</span>
+        </div>
+        <div id="agecurve"><div class="empty">Collecting outcomes</div></div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <div class="panel-hd">
+          <span class="eyebrow">Issuer health</span>
+          <span class="count">click a row to drill down</span>
+        </div>
+        <div id="issuers"><div class="empty">Building baselines</div></div>
+      </div>
+
+      <div class="panel" style="margin-top:14px">
+        <div class="panel-hd">
+          <span class="eyebrow">Approval queue</span>
+          <span class="count" id="apvcount">—</span>
+        </div>
+        <div id="approvals" style="max-height:400px;overflow-y:auto">
+          <div class="empty">Nothing held. Actions above ₹25,000 or below the confidence floor land here.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Decision detail"></aside>
+
+<script>
+const CHIP = {
+  RETRY_NOW:['c-retry','retry now'], RETRY_AFTER_WINDOW:['c-wait','hold + retry'],
+  SWITCH_RAIL:['c-switch','switch rail'], CUSTOMER_ACTION:['c-nudge','nudge customer'],
+  UNRECOVERABLE:['c-dead','no spend']
+};
+const WF_COLOR = {
+  SWITCH_RAIL:'var(--switch)', CUSTOMER_ACTION:'var(--held)',
+  RETRY_NOW:'var(--recovered)', RETRY_AFTER_WINDOW:'var(--wait)', UNRECOVERABLE:'var(--lost)'
+};
+
+function inr(p){
+  const r = p/100;
+  if (r >= 1e7) return (r/1e7).toFixed(2)+' Cr';
+  if (r >= 1e5) return (r/1e5).toFixed(2)+' L';
+  return Math.round(r).toLocaleString('en-IN');
+}
+function inrFull(p){ return '₹'+(p/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function pct(x){ return (x*100).toFixed(1)+'%'; }
+function clock(iso){ return iso.slice(5,16).replace('T',' '); }
+
+let seen = new Set(), current = null, latest = [];
+
+async function tick(){
+  let d;
+  try { d = await (await fetch('/api/stream?step=14&limit=60')).json(); }
+  catch(e){ document.getElementById('livedot').style.background='var(--lost)'; return; }
+
+  latest = d.feed;
+  renderMetrics(d.metrics);
+  renderFeed(d.feed);
+  renderIssuers(d.issuers);
+  renderApprovals();
+  renderActionStrip();
+  renderAgeCurve();
+}
+
+async function renderActionStrip(){
+  const a = await (await fetch('/api/action-required')).json();
+  const el = document.getElementById('actstrip');
+  if(!a.approvals && !a.issuer_alerts && !a.follow_ups){ el.style.display='none'; return; }
+  el.style.display='flex';
+  document.getElementById('a-approvals').innerHTML =
+    '<b>'+a.approvals+'</b> approvals <span> ₹'+inr(a.held_value_paise)+' held</span>';
+  document.getElementById('a-issuers').innerHTML =
+    '<b>'+a.issuer_alerts+'</b> issuer alerts'
+    + (a.alerting_pairs.length ? ' <span> '+a.alerting_pairs.join(', ')+'</span>' : '');
+  document.getElementById('a-follow').innerHTML =
+    '<b>'+a.follow_ups+'</b> customer follow-ups';
+}
+
+async function renderAgeCurve(){
+  const d = await (await fetch('/api/age-curve')).json();
+  const el = document.getElementById('agecurve');
+  const live = d.bands.filter(b=>b.attempted>0);
+  if(!live.length) return;
+  const max = Math.max(...live.map(b=>b.probability), 0.01);
+  el.innerHTML = live.map(b=>
+    '<div class="agerow"><span class="bd">'+b.band+'</span>'
+    + '<span class="track"><span class="fill" style="width:'+(b.probability/max*100)+'%"></span></span>'
+    + '<span class="pc">'+(b.probability*100).toFixed(0)+'%</span>'
+    + '<span class="vl">₹'+inr(b.value_paise)+'  n'+b.attempted+'</span></div>'
+  ).join('') + '<div style="padding:9px 16px;font-family:var(--mono);font-size:10px;'
+    + 'color:var(--faint);line-height:1.5">Recovery probability by how stale the failure was '
+    + 'when the action fired. Decay is measured, not assumed.</div>';
+}
+
+async function openIssuer(issuer, method){
+  let d;
+  try { d = await (await fetch('/api/issuer-detail?issuer='+encodeURIComponent(issuer)
+        +'&method='+encodeURIComponent(method))).json(); } catch(e){ return; }
+  if(!d.found) return;
+  const c = d.status==='outage'?'var(--lost)':d.status==='degraded'?'var(--held)':'var(--faint)';
+  document.getElementById('drawer').innerHTML =
+    '<div class="dw-hd"><button class="closeb" onclick="closeDrawer()"></button>'
+    + '<div class="eyebrow">Issuer drill-down</div>'
+    + '<div class="mono" style="font-size:20px;font-weight:600;margin-top:6px">'
+    + d.issuer+'  '+d.method+'</div>'
+    + '<div class="mono" style="font-size:12px;color:'+c+';margin-top:3px;font-weight:600">'
+    + d.status.toUpperCase()+'</div></div>'
+
+    + (!d.sample_sufficient ?
+      '<div class="dw-sec"><div class="quote" style="border-left-color:var(--held)">'
+      + 'Sample too small to act on. '+d.failures_in_window+' failure(s) in the window '
+      + 'against an expected '+d.expected_in_window+'. A high ratio built from one or two '
+      + 'transactions is not evidence of an incident.</div></div>' : '')
+
+    + '<div class="dw-sec"><div class="eyebrow">Burst detection</div>'
+    + '<dl class="kv" style="margin-top:8px">'
+    + '<dt>failures in window</dt><dd>'+d.failures_in_window+'</dd>'
+    + '<dt>expected</dt><dd>'+d.expected_in_window+'</dd>'
+    + '<dt>burst ratio</dt><dd style="color:'+c+'">'+d.burst_ratio+'</dd>'
+    + '<dt>sample sufficient</dt><dd>'+(d.sample_sufficient?'yes':'no — below event floor')+'</dd>'
+    + (d.degraded_since?'<dt>degraded since</dt><dd>'+d.degraded_since.replace('T',' ')+'</dd>':'')
+    + '</dl></div>'
+
+    + '<div class="dw-sec"><div class="eyebrow">Exposure</div>'
+    + '<dl class="kv" style="margin-top:8px">'
+    + '<dt>observed payments</dt><dd>'+d.observed_payments.toLocaleString('en-IN')+'</dd>'
+    + '<dt>value at risk</dt><dd>'+inrFull(d.at_risk_paise)+'</dd>'
+    + '<dt>recovered</dt><dd>'+inrFull(d.recovered_paise)+'</dd>'
+    + '<dt>recovery rate</dt><dd>'+pct(d.recovery_rate)+'</dd></dl></div>'
+
+    + '<div class="dw-sec"><div class="eyebrow">Top error codes</div>'
+    + '<dl class="kv" style="margin-top:8px">'
+    + d.top_error_codes.map(e=>'<dt>'+e.count+'</dt><dd>'+e.code+'</dd>').join('')
+    + '</dl></div>'
+
+    + '<div class="dw-sec"><div class="eyebrow">Suggested action</div>'
+    + '<div class="quote" style="margin-top:8px">'+d.suggested_action+'</div></div>';
+
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('scrim').classList.add('open');
+}
+
+function renderMetrics(m){
+  document.getElementById('recovered').textContent = inr(m.recovered_paise);
+  document.getElementById('atrisk').textContent = '₹'+inr(m.at_risk_paise);
+  document.getElementById('progress').textContent =
+    m.processed.toLocaleString('en-IN')+' / '+m.total.toLocaleString('en-IN')+' processed';
+  document.getElementById('tierpill').textContent =
+    'triage tier 2: '+(m.model_tier==='model'?'model':'keyword fallback');
+
+  const lift = document.getElementById('lift');
+  lift.textContent = (m.lift_pct>=0?'+':'')+m.lift_pct.toFixed(1)+'% vs baseline';
+  lift.style.color = m.lift_pct>=0?'var(--recovered)':'var(--lost)';
+  lift.style.background = m.lift_pct>=0?'var(--recovered-soft)':'var(--lost-soft)';
+
+  document.getElementById('s-rate').textContent = pct(m.recovery_rate);
+  document.getElementById('s-rate-sub').textContent = 'baseline '+pct(m.baseline_recovery_rate);
+  document.getElementById('s-eff').textContent = pct(m.attempt_efficiency);
+  document.getElementById('s-waste').textContent = m.wasted.toLocaleString('en-IN');
+  document.getElementById('s-held').textContent = m.guardrails.held_for_approval.toLocaleString('en-IN');
+  document.getElementById('s-held-sub').textContent = '₹'+inr(m.guardrails.held_value_paise)+' held';
+  const cpd = m.processed ? m.model_cost_usd/m.processed : 0;
+  document.getElementById('s-cost').textContent = '$'+m.model_cost_usd.toFixed(4);
+  document.getElementById('s-cost-sub').textContent = '$'+cpd.toFixed(6)+' per decision';
+
+  const bar = document.getElementById('wfbar');
+  const denom = m.at_risk_paise || 1;
+  bar.innerHTML = '';
+  const order = ['SWITCH_RAIL','CUSTOMER_ACTION','RETRY_NOW','RETRY_AFTER_WINDOW'];
+  const legend = [];
+  order.forEach(k=>{
+    const b = m.by_archetype[k]; if(!b || !b.recovered_paise) return;
+    const seg = document.createElement('div');
+    seg.className='wf-seg';
+    seg.style.width = (b.recovered_paise/denom*100)+'%';
+    seg.style.background = WF_COLOR[k];
+    seg.innerHTML = '<span>'+inr(b.recovered_paise)+'</span>';
+    seg.title = CHIP[k][1]+' — ₹'+inr(b.recovered_paise)+' from '+b.recovered.toLocaleString('en-IN')+' payments';
+    bar.appendChild(seg);
+    legend.push('<div class="lg"><span class="sw" style="background:'+WF_COLOR[k]+'"></span>'
+      +CHIP[k][1]+'  ₹'+inr(b.recovered_paise)+'</div>');
+  });
+  legend.push('<div class="lg"><span class="sw" style="background:#e3e9ec;border:1px solid var(--rule)"></span>not recovered  ₹'
+    +inr(m.at_risk_paise-m.recovered_paise)+'</div>');
+  document.getElementById('wflegend').innerHTML = legend.join('');
+
+  const tick = document.getElementById('wftick');
+  tick.style.left = Math.min(99.6, m.baseline_recovered_paise/denom*100)+'%';
+  tick.setAttribute('data-label','baseline ₹'+inr(m.baseline_recovered_paise));
+}
+
+function renderFeed(rows){
+  const el = document.getElementById('feed');
+  document.getElementById('feedcount').textContent = rows.length+' most recent';
+  el.innerHTML = rows.map(r=>{
+    const [cls,label] = CHIP[r.archetype] || ['c-retry',r.archetype];
+    const fresh = !seen.has(r.payment_id); seen.add(r.payment_id);
+    const state = r.recovered ? 'ok' : (r.status==='held_for_approval' ? 'held'
+                 : (r.status==='executed' ? '' : 'blocked'));
+    const out = r.recovered ? '<span class="f-out win">+₹'+inr(r.recovered_paise)+'</span>'
+      : '<span class="f-out miss">'+(r.status==='executed'?'no return':r.status.replace(/_/g,' '))+'</span>';
+    return '<div class="frow '+state+(fresh?' new':'')+'" data-id="'+r.payment_id+'">'
+      + '<div class="mono" style="font-size:10.5px;color:var(--faint)">'+clock(r.failed_at)+'</div>'
+      + '<div class="f-err"><span class="code">'+(r.error_code||r.error_description)+'</span>'
+      + '<span class="meta">'+r.issuer+' - '+r.method
+      + (r.issuer_status!=='healthy' ? ' - <span style="color:var(--lost)">'+r.issuer_status+' '+r.burst_ratio+'x</span>':'')
+      + (r.is_long_tail?' - <span class="chip c-tail">uncatalogued</span>':'')+'</span></div>'
+      + '<div class="f-amt">₹'+inr(r.amount_paise)+'</div>'
+      + '<div><span class="chip '+cls+'">'+label+'</span></div>'
+      + out + '</div>';
+  }).join('');
+  el.querySelectorAll('.frow').forEach(n=>n.onclick=()=>openDrawer(n.dataset.id));
+}
+
+function renderIssuers(list){
+  const el = document.getElementById('issuers');
+  if(!list.length) return;
+  el.innerHTML = list.map(i=>{
+    const c = i.status==='outage'?'var(--lost)':i.status==='degraded'?'var(--held)':'var(--faint)';
+    const w = i.status==='healthy' ? 3 : Math.min(100, (i.burst_ratio||0)/5*100);
+    return '<div class="iss"><span class="nm">'+i.issuer+' <span style="color:var(--faint)">'+i.method+'</span></span>'
+      + '<span class="track"><span class="fill" style="width:'+Math.max(3,w)+'%;background:'+c+'"></span></span>'
+      + '<span class="rt" style="color:'+c+'">'+(i.burst_ratio? i.burst_ratio+'x':'-')
+      + '<span style="color:var(--faint)"> n'+i.failures_in_window+'</span></span></div>';
+  }).join('');
+  el.querySelectorAll('.iss').forEach((n,idx)=>{
+    n.onclick = ()=> openIssuer(list[idx].issuer, list[idx].method);
+  });
+}
+
+async function renderApprovals(){
+  const d = await (await fetch('/api/approvals?limit=25')).json();
+  const el = document.getElementById('approvals');
+  document.getElementById('apvcount').textContent = d.queue.length+' held';
+  if(!d.queue.length){
+    el.innerHTML='<div class="empty">Nothing held. Actions above the threshold land here.</div>';
+    return;
+  }
+  el.innerHTML = d.queue.map(a=>
+    '<div class="apv"><div class="apv-top"><span class="amt">'+inrFull(a.amount_paise)+'</span>'
+    + '<span class="chip '+(CHIP[a.archetype]||['c-retry'])[0]+'">'+(CHIP[a.archetype]||['','?'])[1]+'</span>'
+    + '<span class="mono" style="margin-left:auto;font-size:10px;color:var(--faint)">conf '+a.confidence+'</span></div>'
+    + '<div class="why">'+a.guardrail_reason+' - '+a.reasoning+'</div>'
+    + '<button class="rowbtn go" data-k="'+a.idempotency_key+'" data-a="1">Approve</button> '
+    + '<button class="rowbtn no" data-k="'+a.idempotency_key+'" data-a="0">Reject</button></div>'
+  ).join('');
+  el.querySelectorAll('.rowbtn').forEach(b=>b.onclick=async()=>{
+    await fetch('/api/approvals/resolve',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({idempotency_key:b.dataset.k, approve:b.dataset.a==='1'})});
+    renderApprovals(); loadAudit();
+  });
+}
+
+async function loadAudit(){
+  const q = document.getElementById('auditq').value.trim();
+  const d = await (await fetch('/api/audit?limit=90&q='+encodeURIComponent(q))).json();
+  const el = document.getElementById('audit');
+  if(!d.entries.length){ el.innerHTML='<div class="empty">No entries match.</div>'; return; }
+  el.innerHTML = d.entries.map(e=>
+    '<div class="arow"><span style="color:var(--faint)">'+e.payment_id.slice(0,14)+'</span>'
+    + '<span>₹'+inr(e.amount_paise)+'</span>'
+    + '<span class="st '+e.status+'">'+e.status.replace(/_/g,' ')+'</span>'
+    + '<span class="rsn">'+e.reasoning+'</span>'
+    + '<span class="idk" style="color:var(--faint)">'+e.idempotency_key.slice(0,12)+'</span></div>'
+  ).join('');
+}
+
+function openDrawer(id){
+  const r = latest.find(x=>x.payment_id===id); if(!r) return;
+  current = r;
+  const a = r.action || {};
+  const chain = [
+    'Triage - '+r.tier+' tier'+(r.is_long_tail?' (uncatalogued acquirer string)':''),
+    'check_issuer_health - '+r.issuer+'/'+r.method+' is '+r.issuer_status
+      +(r.burst_ratio?' at '+r.burst_ratio+'x its baseline':''),
+    'get_customer_history - reliability signal applied',
+    a.action ? (a.action==='nudge' ? 'draft_nudge - template '+(a.template_id||'generic')
+      : 'schedule_retry - '+a.rail+(a.rail_switched?' (rail switched)':'')+' at +'+a.delay_minutes+' min')
+      : 'no action proposed',
+    'Guardrails - '+r.status.replace(/_/g,' ')+': '+r.guardrail_reason
+  ];
+  document.getElementById('drawer').innerHTML =
+    '<div class="dw-hd"><button class="closeb" onclick="closeDrawer()">x</button>'
+    + '<div class="eyebrow">Decision detail</div>'
+    + '<div class="mono" style="font-size:20px;font-weight:600;margin-top:6px">'+inrFull(r.amount_paise)+'</div>'
+    + '<div class="mono" style="font-size:11px;color:var(--faint);margin-top:2px">'+r.payment_id+'</div></div>'
+    + '<div class="dw-sec"><div class="eyebrow">Failure</div><div class="quote" style="margin-top:8px">'+r.error_description+'</div>'
+    + '<dl class="kv" style="margin-top:12px"><dt>error code</dt><dd>'+(r.error_code||'uncatalogued')+'</dd>'
+    + '<dt>rail</dt><dd>'+r.issuer+' - '+r.method+'</dd>'
+    + '<dt>issuer state</dt><dd>'+r.issuer_status+(r.burst_ratio?' ('+r.burst_ratio+'x baseline)':'')+'</dd>'
+    + '<dt>failed at</dt><dd>'+r.failed_at.replace('T',' ')+'</dd>'
+    + '<dt>customer</dt><dd>'+r.customer_id+'</dd></dl></div>'
+    + '<div class="dw-sec"><div class="eyebrow">Decision chain</div>'
+    + '<ul class="chain">'+chain.map(c=>'<li>'+c+'</li>').join('')+'</ul></div>'
+    + '<div class="dw-sec"><div class="eyebrow">Why this action</div>'
+    + '<div class="quote" style="margin-top:8px">'+r.reasoning+'</div>'
+    + '<dl class="kv" style="margin-top:12px"><dt>archetype</dt><dd>'+r.archetype+'</dd>'
+    + '<dt>confidence</dt><dd>'+r.confidence+'</dd>'
+    + '<dt>tools called</dt><dd>'+r.tool_calls.join(', ')+'</dd></dl></div>'
+    + (a.body ? '<div class="dw-sec"><div class="eyebrow">Message drafted</div>'
+        + '<div class="quote" style="margin-top:8px">'+a.body+'</div>'
+        + '<dl class="kv" style="margin-top:12px"><dt>channel</dt><dd>'+a.channel+'</dd>'
+        + '<dt>template</dt><dd>'+a.template_id+'</dd></dl></div>' : '')
+    + '<div class="dw-sec"><div class="eyebrow">Guardrail record</div>'
+    + '<dl class="kv" style="margin-top:8px"><dt>status</dt><dd class="st '+r.status+'">'+r.status.replace(/_/g,' ')+'</dd>'
+    + '<dt>reason</dt><dd>'+r.guardrail_reason+'</dd>'
+    + '<dt>idempotency key</dt><dd>'+r.idempotency_key+'</dd>'
+    + '<dt>outcome</dt><dd>'+(r.recovered?'recovered '+inrFull(r.recovered_paise):'no return')+'</dd></dl></div>';
+
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('scrim').classList.add('open');
+}
+function closeDrawer(){
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('scrim').classList.remove('open');
+}
+document.getElementById('scrim').onclick = closeDrawer;
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDrawer(); });
+
+const killBtn = document.getElementById('kill');
+const ctrlPanel = document.getElementById('ctrlpanel');
+
+killBtn.onclick = e => { e.stopPropagation(); ctrlPanel.classList.toggle('open'); };
+document.addEventListener('click', e=>{
+  if(!ctrlPanel.contains(e.target) && e.target!==killBtn) ctrlPanel.classList.remove('open');
+});
+
+function refreshControlLabel(){
+  const scopes = [...ctrlPanel.querySelectorAll('[data-scope]')].filter(c=>c.checked);
+  const dry = document.getElementById('dryrun').checked;
+  killBtn.classList.toggle('on', scopes.length>0);
+  killBtn.classList.toggle('dryflag', dry && scopes.length===0);
+  killBtn.textContent = scopes.length
+    ? 'Suppressing '+scopes.length+(dry?' + dry run':'')
+    : dry ? 'Dry run' : 'Controls';
+  document.getElementById('livedot').style.background =
+    scopes.length ? 'var(--lost)' : dry ? 'var(--wait)' : 'var(--recovered)';
+}
+
+ctrlPanel.querySelectorAll('[data-scope]').forEach(cb=>{
+  cb.onchange = async ()=>{
+    await fetch('/api/kill-switch',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({engaged:cb.checked, scope:cb.dataset.scope})});
+    refreshControlLabel();
+  };
+});
+
+document.getElementById('dryrun').onchange = async function(){
+  await fetch('/api/dry-run',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({enabled:this.checked})});
+  refreshControlLabel();
+};
+
+let t; document.getElementById('auditq').oninput = ()=>{ clearTimeout(t); t=setTimeout(loadAudit,220); };
+
+tick(); loadAudit();
+setInterval(tick, 1700);
+setInterval(loadAudit, 6000);
+</script>
+</body>
+</html>
+
